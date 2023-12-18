@@ -1,0 +1,26 @@
+{
+    "apiVersion": "v1",
+    "kind": "Service",
+    "metadata": {
+        "name": "os-svc"
+    },
+    "spec": {
+        "selector": {
+            "app": "os-dep"
+        },
+        "ports": [
+            {
+                "port": 4000,
+                "targetPort": "codeserver",
+                "protocol": "TCP",
+                "name": "code"
+            },
+            {
+                "port": 80,
+                "targetPort": "http",
+                "protocol": "TCP",
+                "name": "nginx"
+            }
+        ]
+    }
+}

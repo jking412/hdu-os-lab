@@ -1,0 +1,51 @@
+{
+  "metadata": {
+    "name": "ngx-dep"
+  },
+  "spec": {
+    "replicas": 1,
+    "selector": {
+      "matchLabels": {
+        "ngx": "ngx-dep"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "ngx": "ngx-dep",
+          "app": "os-dep"
+        }
+      },
+      "spec": {
+        "volumes": [
+          {
+            "name": "ngx-conf",
+            "configMap": {
+              "name": "ngx-conf"
+            }
+          }
+        ],
+        "containers": [
+          {
+            "name": "nginx",
+            "image": "nginx:alpine",
+            "imagePullPolicy": "IfNotPresent",
+            "ports": [
+              {
+                "name": "http",
+                "containerPort": 80,
+                "protocol": "TCP"
+              }
+            ],
+            "volumeMounts": [
+              {
+                "name": "ngx-conf",
+                "mountPath": "/etc/nginx/conf.d"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

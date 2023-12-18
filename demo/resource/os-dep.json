@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "name": "os-dep"
+  },
+  "spec": {
+    "replicas": 1,
+    "selector": {
+      "matchLabels": {
+        "app": "os-dep"
+      }
+    },
+    "template": {
+      "metadata": {
+        "labels": {
+          "app": "os-dep"
+        }
+      },
+      "spec": {
+        "containers": [
+          {
+            "name": "os",
+            "image": "os:v3",
+            "imagePullPolicy": "IfNotPresent",
+            "ports": [
+              {
+                "containerPort": 8080,
+                "protocol": "TCP",
+                "name": "codeserver"
+              }
+            ],
+            "env": [
+              {
+                "name": "CODE_SERVER_ARGS",
+                "value": "--disable-workspace-trust --auth none"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

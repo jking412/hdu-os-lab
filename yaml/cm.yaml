@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ngx-conf-1
+
+data:
+  default.conf: |
+    upstream codeserver {
+      server os-svc-1:4000;
+    }
+    server {
+      listen 80;
+      location /osenv/1/ {
+            proxy_pass http://codeserver/;
+          proxy_set_header Host $http_host;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection upgrade;
+          proxy_set_header Accept-Encoding gzip;
+        }
+    
+    }
+

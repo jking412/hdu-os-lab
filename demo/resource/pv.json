@@ -1,0 +1,20 @@
+{
+    "metadata": {
+        "name": "os-pv-volume",
+        "labels": {
+            "type": "local"
+        }
+    },
+    "spec": {
+        "storageClassName": "manual",
+        "capacity": {
+            "storage": "4Gi"
+        },
+        "accessModes": [
+            "ReadWriteOnce"
+        ],
+        "hostPath": {
+            "path": "/home/jking/GolandProjects/os-online/vol"
+        }
+    }
+}

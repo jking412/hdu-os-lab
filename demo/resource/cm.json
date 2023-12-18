@@ -1,0 +1,8 @@
+{
+  "metadata": {
+    "name": "ngx-conf"
+  },
+  "data": {
+    "default.conf": "upstream codeserver {\n  server os-svc:4000;\n}\nserver {\n  listen 80;\n  location /osenv/1/ {\n        proxy_pass http://codeserver/;\n      proxy_set_header Host $http_host;\n      proxy_set_header Upgrade $http_upgrade;\n      proxy_set_header Connection upgrade;\n      proxy_set_header Accept-Encoding gzip;\n    }\n\n}"
+  }
+}

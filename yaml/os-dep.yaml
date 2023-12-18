@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: os-dep-1
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: os-dep-1
+
+
+  template:
+    metadata:
+      labels:
+        app: os-dep-1
+
+    spec:
+      containers:
+        - image: os:v3
+          imagePullPolicy: IfNotPresent
+          name: os
+          ports:
+            - name: codeserver
+              containerPort: 8080
+          env:
+            - name: CODE_SERVER_ARGS
+              value: --disable-workspace-trust

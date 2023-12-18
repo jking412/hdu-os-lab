@@ -1,0 +1,248 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: os-dep-1
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: os-dep-1
+
+
+  template:
+    metadata:
+      labels:
+        app: os-dep-1
+    
+    spec:
+      containers:
+      - image: os:v3
+        imagePullPolicy: IfNotPresent
+        name: os
+        ports:
+        - name: codeserver
+          containerPort: 8080
+        env:
+        - name: CODE_SERVER_ARGS
+          value: --disable-workspace-trust
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ngx-conf-1
+
+data:
+  default.conf: |
+    upstream codeserver {
+      server os-svc-1:4000;
+    }
+    server {
+      listen 80;
+      location /osenv/1/ {
+            proxy_pass http://codeserver/;
+          proxy_set_header Host $http_host;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection upgrade;
+          proxy_set_header Accept-Encoding gzip;
+        }
+    
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ngx-dep-1
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      ngx: ngx-dep-1
+
+  template:
+    metadata:
+      labels:
+        ngx: ngx-dep-1
+        app: os-dep-1  
+    
+    spec:
+      volumes:
+      - name: ngx-conf-1
+        configMap:
+          name: ngx-conf-1
+
+      containers:
+      - image: nginx:alpine
+        imagePullPolicy: IfNotPresent
+        name: nginx
+        ports:
+        - name: http
+          containerPort: 80
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: ngx-conf-1
+
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: os-svc-1
+
+spec:
+  selector:
+    app: os-dep-1
+
+  ports:
+  - port: 4000
+    targetPort: codeserver
+    protocol: TCP
+    name: code
+  - port: 80
+    targetPort: http
+    protocol: TCP
+    name: nginx
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ngx-conf-2
+
+data:
+  default.conf: |
+    upstream codeserver {
+      server os-svc-2:4000;
+    }
+    server {
+      listen 80;
+      location /osenv/2/ {
+      		proxy_pass http://codeserver/;
+          proxy_set_header Host $http_host;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection upgrade;
+          proxy_set_header Accept-Encoding gzip;
+    	}
+
+    }
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ngx-dep-2
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      ngx: ngx-dep-2
+
+  template:
+    metadata:
+      labels:
+        ngx: ngx-dep-2
+        app: os-dep-2  
+    
+    spec:
+      volumes:
+      - name: ngx-conf-2
+        configMap:
+          name: ngx-conf-2
+
+      containers:
+      - image: nginx:alpine
+        imagePullPolicy: IfNotPresent
+        name: nginx
+        ports:
+        - name: http
+          containerPort: 80
+        volumeMounts:
+        - mountPath: /etc/nginx/conf.d
+          name: ngx-conf-2
+  
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: os-dep-2
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: os-dep-2
+
+
+  template:
+    metadata:
+      labels:
+        app: os-dep-2
+    
+    spec:
+      containers:
+      - image: os:v3
+        imagePullPolicy: IfNotPresent
+        name: os
+        ports:
+        - name: codeserver
+          containerPort: 8080
+        env:
+        - name: CODE_SERVER_ARGS
+          value: --disable-workspace-trust          
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: os-svc-2
+
+spec:
+  selector:
+    app: os-dep-2
+
+  ports:
+  - port: 4000
+    targetPort: codeserver
+    protocol: TCP
+    name: code
+  - port: 80
+    targetPort: http
+    protocol: TCP
+    name: nginx
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: os-ingress
+
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /osenv/1
+            pathType: Prefix
+            backend:
+              service:
+                name:  os-svc-1
+                port:
+                  number: 80
+          - path: /osenv/2
+            pathType: Prefix
+            backend:
+              service:
+                name:  os-svc-2
+                port:
+                  number: 80
+
+
+
+

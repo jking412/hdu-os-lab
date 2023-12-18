@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ngx-dep-1
+
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      ngx: ngx-dep-1
+
+  template:
+    metadata:
+      labels:
+        ngx: ngx-dep-1
+        app: os-dep-1
+
+    spec:
+      volumes:
+        - name: ngx-conf-1
+          configMap:
+            name: ngx-conf-1
+
+      containers:
+        - image: nginx:alpine
+          imagePullPolicy: IfNotPresent
+          name: nginx
+          ports:
+            - name: http
+              containerPort: 80
+          volumeMounts:
+            - mountPath: /etc/nginx/conf.d
+              name: ngx-conf-1

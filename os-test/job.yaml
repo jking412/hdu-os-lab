@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: job-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: job
+  capacity:
+    storage: 4Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/home/jking/GolandProjects/os-online/vol"
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: job-pv-claim
+spec:
+  storageClassName: job
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi
+
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: os-job
+spec:
+  ttlSecondsAfterFinished: 30
+  template:
+    spec:
+      volumes:
+        - name: os-pv-storage
+          persistentVolumeClaim:
+            claimName: job-pv-claim
+      containers:
+        - name: os-job
+          image: os-test:v3
+          imagePullPolicy: IfNotPresent
+          command: ["/app/main","/work"]
+          volumeMounts:
+            - mountPath: "/work"
+              name: os-pv-storage
+      restartPolicy: Never
