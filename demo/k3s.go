@@ -124,7 +124,7 @@ func deleteIngress(envNum int) error {
 	tempIngress := osIngressT.DeepCopy()
 
 	for i, v := range oldIngress.Spec.Rules[0].HTTP.Paths {
-		if v.Path == fmt.Sprintf("%s%d", osSvcPrefix, envNum) {
+		if v.Path == fmt.Sprintf("%s%d", ingressPathPrefix, envNum) {
 			if len(oldIngress.Spec.Rules[0].HTTP.Paths) == 1 {
 				oldIngress.Spec.Rules[0].HTTP.Paths = make([]networkingv1.HTTPIngressPath, 0)
 			} else if i == len(oldIngress.Spec.Rules[0].HTTP.Paths)-1 {
