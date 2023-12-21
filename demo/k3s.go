@@ -250,26 +250,12 @@ func createOSDep(envNum int) error {
 
 func createConfigMap(envNum int) error {
 
-	configMap := v1.ConfigMap{}
-
-	filename := resourcePath + "/" + cmName
-
-	cmFile, err := os.Open(filename)
+	configMap, err := newNgxConfigMap(envNum)
 	if err != nil {
 		return err
 	}
 
-	decoder := json.NewDecoder(cmFile)
-
-	err = decoder.Decode(&configMap)
-	if err != nil {
-		return err
-	}
-
-	configMap.Name = configMap.Name + "-" + fmt.Sprintf("%d", envNum)
-	configMap.Data["default.conf"] = fmt.Sprintf(ngxConf, "os-svc-"+fmt.Sprintf("%d", envNum), envNum)
-
-	_, err = configMapClient.Create(context.TODO(), &configMap, metav1.CreateOptions{})
+	_, err = configMapClient.Create(context.TODO(), configMap, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
