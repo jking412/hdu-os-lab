@@ -2,43 +2,18 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	appv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
 	"strconv"
 	"strings"
 )
 
-const resourcePath = "/home/jking/GolandProjects/os-online/demo/resource"
-const cmName = "cm.json"
-const osDepName = "os-dep.json"
-const ngxDepName = "ngx-dep.json"
-const osSvcName = "os-svc.json"
-const ingressName = "os-ingress"
-
 var currentMaxEnv = 0
-
-var ngxConf = `upstream codeserver {
-  server %s:4000;
-}
-server {
-  listen 80;
-  location /osenv/%d/ {
-        proxy_pass http://codeserver/;
-      proxy_set_header Host $http_host;
-      proxy_set_header Upgrade $http_upgrade;
-      proxy_set_header Connection upgrade;
-      proxy_set_header Accept-Encoding gzip;
-    }
-
-}`
 
 func initClient() {
 	config, err := clientcmd.BuildConfigFromFlags("", "/home/jking/.kube/config")
@@ -159,25 +134,12 @@ func deleteIngress(envNum int) error {
 
 func createOSSvc(envNum int) error {
 
-	filename := resourcePath + "/" + osSvcName
-
-	svcConfig := v1.Service{}
-	svcConfigFile, err := os.Open(filename)
+	svc, err := newOsSvc(envNum)
 	if err != nil {
 		return err
 	}
 
-	decoder := json.NewDecoder(svcConfigFile)
-
-	err = decoder.Decode(&svcConfig)
-	if err != nil {
-		return err
-	}
-
-	svcConfig.Name = svcConfig.Name + "-" + fmt.Sprintf("%d", envNum)
-	svcConfig.Spec.Selector["app"] = svcConfig.Spec.Selector["app"] + "-" + fmt.Sprintf("%d", envNum)
-
-	_, err = svcClient.Create(context.TODO(), &svcConfig, metav1.CreateOptions{})
+	_, err = svcClient.Create(context.Background(), svc, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -187,31 +149,12 @@ func createOSSvc(envNum int) error {
 
 func createNgxDep(envNum int) error {
 
-	deploymentsConfig := appv1.Deployment{}
-
-	filename := resourcePath + "/" + ngxDepName
-
-	deploymentsConfigFile, err := os.Open(filename)
+	ngxDep, err := newNgxDep(envNum)
 	if err != nil {
 		return err
 	}
 
-	decoder := json.NewDecoder(deploymentsConfigFile)
-
-	err = decoder.Decode(&deploymentsConfig)
-	if err != nil {
-		return err
-	}
-
-	deploymentsConfig.Name = deploymentsConfig.Name + "-" + fmt.Sprintf("%d", envNum)
-	deploymentsConfig.Spec.Selector.MatchLabels["ngx"] = deploymentsConfig.Spec.Selector.MatchLabels["ngx"] + "-" + fmt.Sprintf("%d", envNum)
-	deploymentsConfig.Spec.Template.ObjectMeta.Labels["ngx"] = deploymentsConfig.Spec.Template.ObjectMeta.Labels["ngx"] + "-" + fmt.Sprintf("%d", envNum)
-	deploymentsConfig.Spec.Template.ObjectMeta.Labels["app"] = deploymentsConfig.Spec.Template.ObjectMeta.Labels["app"] + "-" + fmt.Sprintf("%d", envNum)
-	deploymentsConfig.Spec.Template.Spec.Volumes[0].Name = deploymentsConfig.Spec.Template.Spec.Volumes[0].Name + "-" + fmt.Sprintf("%d", envNum)
-	deploymentsConfig.Spec.Template.Spec.Volumes[0].ConfigMap.Name = deploymentsConfig.Spec.Template.Spec.Volumes[0].ConfigMap.Name + "-" + fmt.Sprintf("%d", envNum)
-	deploymentsConfig.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name = deploymentsConfig.Spec.Template.Spec.Containers[0].VolumeMounts[0].Name + "-" + fmt.Sprintf("%d", envNum)
-
-	_, err = deploymentsClient.Create(context.TODO(), &deploymentsConfig, metav1.CreateOptions{})
+	_, err = deploymentsClient.Create(context.TODO(), ngxDep, metav1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -221,28 +164,14 @@ func createNgxDep(envNum int) error {
 
 func createOSDep(envNum int) error {
 
-	deploymentsConfig := appv1.Deployment{}
-
-	filename := resourcePath + "/" + osDepName
-
-	deploymentsConfigFile, err := os.Open(filename)
+	osDep, err := newOsDep(envNum)
 	if err != nil {
 		return err
 	}
 
-	decoder := json.NewDecoder(deploymentsConfigFile)
-
-	err = decoder.Decode(&deploymentsConfig)
+	_, err = deploymentsClient.Create(context.Background(), osDep, metav1.CreateOptions{})
 	if err != nil {
 		return err
-	}
-
-	deploymentsConfig.Name = deploymentsConfig.Name + "-" + fmt.Sprintf("%d", envNum)
-	deploymentsConfig.Spec.Selector.MatchLabels["app"] = deploymentsConfig.Spec.Selector.MatchLabels["app"] + "-" + fmt.Sprintf("%d", envNum)
-	deploymentsConfig.Spec.Template.ObjectMeta.Labels["app"] = deploymentsConfig.Spec.Template.ObjectMeta.Labels["app"] + "-" + fmt.Sprintf("%d", envNum)
-	_, err = deploymentsClient.Create(context.TODO(), &deploymentsConfig, metav1.CreateOptions{})
-	if err != nil {
-		panic(err)
 	}
 
 	return nil

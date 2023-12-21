@@ -3,9 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -151,56 +149,56 @@ func destroyEnv(envNum int) {
 	}
 }
 
-func createPV() {
-
-	PVClient := clientSet.CoreV1().PersistentVolumes()
-
-	filename := "pv.json"
-
-	PVConfig := v1.PersistentVolume{}
-
-	PVConfigFile, err := os.Open(filename)
-
-	if err != nil {
-		panic(err)
-	}
-
-	decoder := json.NewDecoder(PVConfigFile)
-
-	err = decoder.Decode(&PVConfig)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = PVClient.Create(context.TODO(), &PVConfig, metav1.CreateOptions{})
-	if err != nil {
-		panic(err)
-	}
-}
-
-func createPVC() {
-
-	PVCClient := clientSet.CoreV1().PersistentVolumeClaims(v1.NamespaceDefault)
-
-	filename := "pvc.json"
-
-	PVCConfig := v1.PersistentVolumeClaim{}
-
-	PVCConfigFile, err := os.Open(filename)
-
-	if err != nil {
-		panic(err)
-	}
-
-	decoder := json.NewDecoder(PVCConfigFile)
-
-	err = decoder.Decode(&PVCConfig)
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = PVCClient.Create(context.TODO(), &PVCConfig, metav1.CreateOptions{})
-	if err != nil {
-		panic(err)
-	}
-}
+//func createPV() {
+//
+//	PVClient := clientSet.CoreV1().PersistentVolumes()
+//
+//	filename := "pv.json"
+//
+//	PVConfig := v1.PersistentVolume{}
+//
+//	PVConfigFile, err := os.Open(filename)
+//
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	decoder := json.NewDecoder(PVConfigFile)
+//
+//	err = decoder.Decode(&PVConfig)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	_, err = PVClient.Create(context.TODO(), &PVConfig, metav1.CreateOptions{})
+//	if err != nil {
+//		panic(err)
+//	}
+//}
+//
+//func createPVC() {
+//
+//	PVCClient := clientSet.CoreV1().PersistentVolumeClaims(v1.NamespaceDefault)
+//
+//	filename := "pvc.json"
+//
+//	PVCConfig := v1.PersistentVolumeClaim{}
+//
+//	PVCConfigFile, err := os.Open(filename)
+//
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	decoder := json.NewDecoder(PVCConfigFile)
+//
+//	err = decoder.Decode(&PVCConfig)
+//	if err != nil {
+//		panic(err)
+//	}
+//
+//	_, err = PVCClient.Create(context.TODO(), &PVCConfig, metav1.CreateOptions{})
+//	if err != nil {
+//		panic(err)
+//	}
+//}
