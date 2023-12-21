@@ -22,8 +22,9 @@ func main() {
 }
 
 func startMenu() {
-	//var created bool
+
 	for {
+
 		// 读如stdin输入
 		fmt.Print("> ")
 		var input string
@@ -42,6 +43,8 @@ func startMenu() {
 			fmt.Print("input envNum: ")
 			fmt.Scanln(&envNum)
 			destroyEnv(envNum)
+		case "list":
+			listEnv()
 		case "exit":
 			os.Exit(0)
 		}
@@ -114,6 +117,11 @@ func destroyEnv(envNum int) {
 
 	configMapClient := clientSet.CoreV1().ConfigMaps(apiv1.NamespaceDefault)
 	err = configMapClient.Delete(context.TODO(), "ngx-conf-"+fmt.Sprintf("%d", envNum), metav1.DeleteOptions{})
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	err = deleteIngress(envNum)
 	if err != nil {
 		fmt.Println(err)
 	}

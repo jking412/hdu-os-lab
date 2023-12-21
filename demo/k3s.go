@@ -21,7 +21,6 @@ const osSvcName = "os-svc.json"
 const ingressName = "os-ingress"
 
 var currentMaxEnv = 0
-var ingressConfig *netv1.Ingress = nil
 
 var ngxConf = string(`upstream codeserver {
   server %s:4000;
@@ -38,46 +37,93 @@ server {
 
 }`)
 
-// {
-// "path": "/osenv/1",
-// "pathType": "Prefix",
-// "backend": {
-// "service": {
-// "name": "os-svc",
-// "port": {
-// "number": 80
-// }
-// }
-// }
-// }
+// ingress struct should not be created by Ingress.Get()
+// if use the struct, you will fail to create a new ingress
 func createIngress() error {
-	ingressClient := clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault)
 
-	path := new(netv1.PathType)
-	*path = netv1.PathTypePrefix
+	var tempIngress *netv1.Ingress
 
-	tempIngress := netv1.Ingress{}
+	oldIngress, err := clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault).Get(context.Background(), ingressName, metav1.GetOptions{})
+	if err != nil {
+		tempIngress = osIngressT.DeepCopy()
+	} else {
+		tempIngress = new(netv1.Ingress)
+		tempIngress.Spec = oldIngress.Spec
+		tempIngress.Name = ingressName
+	}
 
-	tempIngress.Spec.Rules = make([]netv1.IngressRule, 1)
-	tempIngress.Spec.Rules[0].HTTP = new(netv1.HTTPIngressRuleValue)
-	tempIngress.Spec.Rules[0].HTTP.Paths = make([]netv1.HTTPIngressPath, 1)
+	pathType := new(netv1.PathType)
+	*pathType = netv1.PathTypePrefix
 
-	tempIngress.Spec.Rules[0].HTTP.Paths[0].Path = "/osenv/" + fmt.Sprintf("%d", currentMaxEnv)
-	tempIngress.Spec.Rules[0].HTTP.Paths[0].PathType = path
-	tempIngress.Spec.Rules[0].HTTP.Paths[0].Backend.Service = new(netv1.IngressServiceBackend)
-	tempIngress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Name = "os-svc-" + fmt.Sprintf("%d", currentMaxEnv)
-	tempIngress.Spec.Rules[0].HTTP.Paths[0].Backend.Service.Port.Number = 80
+	tempIngress.Spec.Rules[0].HTTP.Paths = append(tempIngress.Spec.Rules[0].HTTP.Paths, netv1.HTTPIngressPath{
+		Path:     "/osenv/" + fmt.Sprintf("%d", currentMaxEnv),
+		PathType: pathType,
+		Backend: netv1.IngressBackend{
+			Service: &netv1.IngressServiceBackend{
+				Name: "os-svc-" + fmt.Sprintf("%d", currentMaxEnv),
+				Port: netv1.ServiceBackendPort{
+					Number: 80,
+				},
+			},
+		},
+	})
 
-	if ingressConfig == nil {
-		var err error
-		tempIngress.ObjectMeta.Name = ingressName
-		ingressConfig, err = ingressClient.Create(context.TODO(), &tempIngress, metav1.CreateOptions{})
+	// 先删除原来的ingress
+	// 不存在就不删除
+	if err != nil {
+		_, err = clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault).Create(context.Background(), tempIngress, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
 	} else {
-		ingressConfig.Spec.Rules[0].HTTP.Paths = append(ingressConfig.Spec.Rules[0].HTTP.Paths, tempIngress.Spec.Rules[0].HTTP.Paths[0])
-		_, err := ingressClient.Update(context.TODO(), ingressConfig, metav1.UpdateOptions{})
+		err = clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault).Delete(context.Background(), ingressName, metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		_, err = clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault).Create(context.Background(), tempIngress, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func deleteIngress(envNum int) error {
+
+	oldIngress, err := clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault).Get(context.Background(), ingressName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	tempIngress := osIngressT.DeepCopy()
+
+	for i, v := range oldIngress.Spec.Rules[0].HTTP.Paths {
+		if v.Path == "/osenv/"+fmt.Sprintf("%d", envNum) {
+			if len(oldIngress.Spec.Rules[0].HTTP.Paths) == 1 {
+				oldIngress.Spec.Rules[0].HTTP.Paths = make([]netv1.HTTPIngressPath, 0)
+			} else if i == len(oldIngress.Spec.Rules[0].HTTP.Paths)-1 {
+				oldIngress.Spec.Rules[0].HTTP.Paths = oldIngress.Spec.Rules[0].HTTP.Paths[:i]
+			} else {
+				oldIngress.Spec.Rules[0].HTTP.Paths = append(oldIngress.Spec.Rules[0].HTTP.Paths[:i], oldIngress.Spec.Rules[0].HTTP.Paths[i+1:]...)
+			}
+			break
+		}
+	}
+
+	tempIngress.Spec = oldIngress.Spec
+
+	if len(oldIngress.Spec.Rules[0].HTTP.Paths) == 0 {
+		err = clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault).Delete(context.Background(), ingressName, metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+	} else {
+		err = clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault).Delete(context.Background(), ingressName, metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+		_, err = clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault).Create(context.Background(), tempIngress, metav1.CreateOptions{})
 		if err != nil {
 			return err
 		}
@@ -211,6 +257,26 @@ func createConfigMap(envNum int) error {
 	return nil
 }
 
+func listEnv() {
+	svcClients := clientSet.CoreV1().Services(apiv1.NamespaceDefault)
+	svc, err := svcClients.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("envNum")
+
+	for _, v := range svc.Items {
+		if v.Name[:6] == "os-svc" {
+			envNum, err := strconv.Atoi(v.Name[7:])
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println("\n", envNum)
+		}
+	}
+}
+
 func initEnvMessage() {
 	svcClients := clientSet.CoreV1().Services(apiv1.NamespaceDefault)
 	svc, err := svcClients.List(context.TODO(), metav1.ListOptions{})
@@ -226,11 +292,6 @@ func initEnvMessage() {
 			}
 			currentMaxEnv = max(currentMaxEnv, envNum)
 		}
-	}
-
-	if currentMaxEnv != 0 {
-		ingressClient := clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault)
-		ingressConfig, _ = ingressClient.Get(context.TODO(), ingressName, metav1.GetOptions{})
 	}
 
 }

@@ -21,13 +21,11 @@ func TestOne(t *testing.T) {
 		panic(err)
 	}
 
-	deploymentsClient := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault)
-
-	err = deploymentsClient.Delete(context.TODO(), "os-dep", metav1.DeleteOptions{})
-
+	ingress, err := clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault).Get(context.Background(), "os-ingress", metav1.GetOptions{})
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println(ingress)
 
 }
 
