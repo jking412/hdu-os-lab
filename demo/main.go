@@ -1,15 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	apiv1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"os"
+	"strconv"
+	"strings"
 )
 
 var clientSet *kubernetes.Clientset
@@ -24,24 +26,38 @@ func main() {
 func startMenu() {
 
 	for {
-
-		// 读如stdin输入
+		// stdin输入
+		// fmt.Scanln seems having some problem
+		// I can't read two variable in one line
+		// use reader instead
 		fmt.Print("> ")
-		var input string
-		_, err := fmt.Scanln(&input)
-		if err != nil {
-			fmt.Println("input error")
-		}
+		reader := bufio.NewReader(os.Stdin)
+		bytes, _, _ := reader.ReadLine()
+
+		input := strings.Split(string(bytes), " ")
 
 		// 以命令行解析
-		switch input {
+		switch input[0] {
 		case "create":
-			currentMaxEnv++
-			createEnv(currentMaxEnv)
+			createEnv()
 		case "delete":
-			var envNum int
-			fmt.Print("input envNum: ")
-			fmt.Scanln(&envNum)
+			envNum, err := strconv.Atoi(input[1])
+			if err != nil {
+				fmt.Println("delete num input error")
+				continue
+			}
+
+			exist, err := isExistEnv(envNum)
+			if err != nil {
+				fmt.Println("get env list error")
+				continue
+			}
+
+			if !exist {
+				fmt.Println("env not exist")
+				continue
+			}
+
 			destroyEnv(envNum)
 		case "list":
 			listEnv()
@@ -53,26 +69,29 @@ func startMenu() {
 
 }
 
-func initClient() {
-	config, err := clientcmd.BuildConfigFromFlags("", "/home/jking/.kube/config")
+func isExistEnv(envNum int) (bool, error) {
+	envNums, err := getAllEnv()
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 
-	clientSet, err = kubernetes.NewForConfig(config)
-	if err != nil {
-		panic(err)
+	exist := false
+
+	for _, num := range envNums {
+		if num == envNum {
+			exist = true
+			break
+		}
 	}
 
-	clientDynamic, err = dynamic.NewForConfig(config)
-	if err != nil {
-		panic(err)
-	}
+	return exist, nil
 }
 
-func createEnv(envNum int) {
+func createEnv() {
 	//createPV()
 	//createPVC()
+	currentMaxEnv++
+	envNum := currentMaxEnv
 	var err error
 	err = createOSDep(envNum)
 	if err != nil {
@@ -98,25 +117,30 @@ func createEnv(envNum int) {
 }
 
 func destroyEnv(envNum int) {
-	deploymentsClient := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault)
-	err := deploymentsClient.Delete(context.TODO(), "ngx-dep-"+fmt.Sprintf("%d", envNum), metav1.DeleteOptions{})
+	err := deploymentsClient.Delete(context.TODO(),
+		fmt.Sprintf("%s%d", ngxDepPrefix, envNum),
+		metav1.DeleteOptions{})
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	err = deploymentsClient.Delete(context.TODO(), "os-dep-"+fmt.Sprintf("%d", envNum), metav1.DeleteOptions{})
+	err = deploymentsClient.Delete(context.TODO(),
+		fmt.Sprintf("%s%d", osDepPrefix, envNum),
+		metav1.DeleteOptions{})
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	svcClients := clientSet.CoreV1().Services(apiv1.NamespaceDefault)
-	err = svcClients.Delete(context.TODO(), "os-svc-"+fmt.Sprintf("%d", envNum), metav1.DeleteOptions{})
+	err = svcClient.Delete(context.TODO(),
+		fmt.Sprintf("%s%d", osSvcPrefix, envNum),
+		metav1.DeleteOptions{})
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	configMapClient := clientSet.CoreV1().ConfigMaps(apiv1.NamespaceDefault)
-	err = configMapClient.Delete(context.TODO(), "ngx-conf-"+fmt.Sprintf("%d", envNum), metav1.DeleteOptions{})
+	err = configMapClient.Delete(context.TODO(),
+		fmt.Sprintf("%s%d", ngxCmPrefix, envNum),
+		metav1.DeleteOptions{})
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -133,7 +157,7 @@ func createPV() {
 
 	filename := "pv.json"
 
-	PVConfig := apiv1.PersistentVolume{}
+	PVConfig := v1.PersistentVolume{}
 
 	PVConfigFile, err := os.Open(filename)
 
@@ -156,11 +180,11 @@ func createPV() {
 
 func createPVC() {
 
-	PVCClient := clientSet.CoreV1().PersistentVolumeClaims(apiv1.NamespaceDefault)
+	PVCClient := clientSet.CoreV1().PersistentVolumeClaims(v1.NamespaceDefault)
 
 	filename := "pvc.json"
 
-	PVCConfig := apiv1.PersistentVolumeClaim{}
+	PVCConfig := v1.PersistentVolumeClaim{}
 
 	PVCConfigFile, err := os.Open(filename)
 
@@ -178,44 +202,5 @@ func createPVC() {
 	_, err = PVCClient.Create(context.TODO(), &PVCConfig, metav1.CreateOptions{})
 	if err != nil {
 		panic(err)
-	}
-}
-
-func deleteAll() {
-	deploymentsClient := clientSet.AppsV1().Deployments(apiv1.NamespaceDefault)
-	err := deploymentsClient.Delete(context.TODO(), "ngx-dep", metav1.DeleteOptions{})
-	if err != nil {
-		fmt.Println(err)
-	}
-	err = deploymentsClient.Delete(context.TODO(), "os-dep", metav1.DeleteOptions{})
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	svcClients := clientSet.CoreV1().Services(apiv1.NamespaceDefault)
-	err = svcClients.Delete(context.TODO(), "os-svc", metav1.DeleteOptions{})
-	if err != nil {
-		fmt.Println(err)
-	}
-	configMapClient := clientSet.CoreV1().ConfigMaps(apiv1.NamespaceDefault)
-	err = configMapClient.Delete(context.TODO(), "ngx-conf", metav1.DeleteOptions{})
-	if err != nil {
-		fmt.Println(err)
-	}
-	ingressClient := clientSet.NetworkingV1().Ingresses(apiv1.NamespaceDefault)
-	err = ingressClient.Delete(context.TODO(), "os-ingress", metav1.DeleteOptions{})
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	PVClient := clientSet.CoreV1().PersistentVolumes()
-	err = PVClient.Delete(context.TODO(), "os-pv-volume", metav1.DeleteOptions{})
-	if err != nil {
-		fmt.Println(err)
-	}
-	PVCClient := clientSet.CoreV1().PersistentVolumeClaims(apiv1.NamespaceDefault)
-	err = PVCClient.Delete(context.TODO(), "os-pv-claim", metav1.DeleteOptions{})
-	if err != nil {
-		fmt.Println(err)
 	}
 }
